@@ -1,3 +1,13 @@
+---
+title: Autonomous Traffic Control OpenEnv
+colorFrom: red
+colorTo: green
+sdk: docker
+app_port: 7860
+tags:
+  - openenv
+  - reinforcement-learning
+---
 # 🚦 Autonomous Traffic Control — OpenEnv
 
 > **Meta PyTorch OpenEnv Hackathon Submission**  
