@@ -1,0 +1,114 @@
+name: autonomous-traffic-control
+version: "1.0.0"
+description: >
+  A real-world OpenEnv environment simulating a 4-way signalised intersection
+  with multi-phase signal control, emergency vehicle prioritization, pedestrian
+  phases, incident management, and time-of-day traffic modelling.
+  An AI agent controls traffic signals to minimise queue lengths and delays
+  while responding correctly to emergency vehicles.
+
+author: "OpenEnv Hackathon Participant"
+tags:
+  - openenv
+  - traffic
+  - multi-agent
+  - emergency-vehicles
+  - real-world
+
+tasks:
+  - name: basic_flow
+    difficulty: easy
+    description: >
+      Manage a 4-way intersection under moderate steady traffic.
+      No emergency vehicles or incidents. Score 0.5+ to succeed.
+    max_steps: 50
+    success_threshold: 0.5
+
+  - name: peak_hour
+    difficulty: medium
+    description: >
+      Rush-hour surge (4-6 PM). Occasional emergency vehicles and pedestrian
+      crossings. Dynamic demand pattern. Score 0.6+ to succeed.
+    max_steps: 75
+    success_threshold: 0.6
+
+  - name: full_control
+    difficulty: hard
+    description: >
+      High-density traffic with frequent emergency vehicles, road incidents,
+      and mandatory pedestrian phases. Frontier-model challenge.
+      Score 0.7+ to succeed.
+    max_steps: 100
+    success_threshold: 0.7
+
+action_space:
+  type: object
+  properties:
+    phase:
+      type: integer
+      minimum: 0
+      maximum: 7
+      description: >
+        Signal phase index (NEMA 8-phase):
+          0=NS Through, 1=NS Left-turn, 2=EW Through, 3=EW Left-turn,
+          4=Pedestrian NS, 5=Pedestrian EW, 6=All-Red, 7=Emergency Corridor
+    duration:
+      type: integer
+      minimum: 5
+      maximum: 60
+      description: How long to hold this phase (seconds)
+    emergency_override:
+      type: boolean
+      description: >
+        Force emergency corridor mode (clears path for approaching emergency
+        vehicle). Only effective when emergency_active=true in observation.
+
+observation_space:
+  type: object
+  properties:
+    queue_N1: {type: integer, description: North lane 1 queue (vehicles)}
+    queue_N2: {type: integer, description: North lane 2 queue (vehicles)}
+    queue_S1: {type: integer, description: South lane 1 queue}
+    queue_S2: {type: integer, description: South lane 2 queue}
+    queue_E1: {type: integer, description: East lane 1 queue}
+    queue_E2: {type: integer, description: East lane 2 queue}
+    queue_W1: {type: integer, description: West lane 1 queue}
+    queue_W2: {type: integer, description: West lane 2 queue}
+    current_phase: {type: integer, description: Active signal phase 0-7}
+    phase_time_remaining: {type: integer, description: Seconds remaining in phase}
+    emergency_active: {type: boolean, description: Emergency vehicle approaching}
+    emergency_direction: {type: string, description: Direction EV is approaching from}
+    emergency_distance: {type: number, description: Metres to intersection}
+    emergency_type: {type: string, description: ambulance/fire/police}
+    step_number: {type: integer}
+    time_of_day: {type: number, description: Hour 0.0-24.0}
+    cumulative_wait: {type: number, description: Total vehicle-seconds waited so far}
+    incident_active: {type: boolean, description: Road incident blocking a lane}
+    pedestrian_waiting: {type: boolean, description: Pedestrians waiting to cross}
+    throughput_last_phase: {type: integer, description: Vehicles cleared so far}
+    avg_wait_time: {type: number, description: Average wait time in seconds}
+
+reward:
+  type: shaped
+  range: [-20, 20]
+  description: >
+    Reward is provided every step (not sparse). Components:
+      +queue_reduction: reward for reducing total queue length
+      +throughput: reward proportional to vehicles cleared
+      -wait_penalty: penalty proportional to current queue depth
+      +emergency_bonus: +5.0 for correct emergency override
+      -emergency_penalty: penalty if EV ignored when within 100m
+      -phase_oscillation: penalty for rapid unnecessary switching
+      -pedestrian_neglect: penalty for ignoring pedestrian demand
+
+endpoints:
+  reset: POST /reset
+  step:  POST /step
+  state: GET  /state
+  grade: GET  /grade
+  tasks: GET  /tasks
+
+infra:
+  port: 7860
+  dockerfile: Dockerfile
+  hf_space: true
