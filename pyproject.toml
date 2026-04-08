@@ -1,4 +1,4 @@
-﻿[project]
+[project]
 name = "traffic-control-env"
 version = "1.0.0"
 description = "Autonomous Traffic Control OpenEnv"
