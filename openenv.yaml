@@ -23,6 +23,7 @@ tasks:
       No emergency vehicles or incidents. Score 0.5+ to succeed.
     max_steps: 50
     success_threshold: 0.5
+    grader: "traffic_env:grade_task"
 
   - name: peak_hour
     difficulty: medium
@@ -31,6 +32,7 @@ tasks:
       crossings. Dynamic demand pattern. Score 0.6+ to succeed.
     max_steps: 75
     success_threshold: 0.6
+    grader: "traffic_env:grade_task"
 
   - name: full_control
     difficulty: hard
@@ -40,6 +42,7 @@ tasks:
       Score 0.7+ to succeed.
     max_steps: 100
     success_threshold: 0.7
+    grader: "traffic_env:grade_task"
 
 action_space:
   type: object
