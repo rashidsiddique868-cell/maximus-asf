@@ -16,7 +16,8 @@ tags:
   - real-world
 
 tasks:
-  - name: basic_flow
+  - id: basic_flow
+    name: basic_flow
     difficulty: easy
     description: >
       Manage a 4-way intersection under moderate steady traffic.
@@ -25,7 +26,8 @@ tasks:
     success_threshold: 0.5
     grader: "traffic_env:grade_task"
 
-  - name: peak_hour
+  - id: peak_hour
+    name: peak_hour
     difficulty: medium
     description: >
       Rush-hour surge (4-6 PM). Occasional emergency vehicles and pedestrian
@@ -34,7 +36,8 @@ tasks:
     success_threshold: 0.6
     grader: "traffic_env:grade_task"
 
-  - name: full_control
+  - id: full_control
+    name: full_control
     difficulty: hard
     description: >
       High-density traffic with frequent emergency vehicles, road incidents,
