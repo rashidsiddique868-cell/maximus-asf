@@ -80,7 +80,7 @@ class StepResponse(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "task": _current_task}
+    return {"status": "healthy", "task": _current_task}
 
 
 @app.post("/reset", response_model=ResetResponse)
@@ -136,7 +136,11 @@ async def grade():
 
 @app.get("/tasks")
 async def list_tasks():
-    return {"tasks": TASK_CONFIGS}
+    tasks_list = [
+        {"name": name, **cfg}
+        for name, cfg in TASK_CONFIGS.items()
+    ]
+    return {"tasks": tasks_list}
 
 
 @app.get("/openenv.yaml", response_class=PlainTextResponse)

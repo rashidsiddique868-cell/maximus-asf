@@ -134,6 +134,7 @@ TASK_CONFIGS = {
         "pedestrian_prob": 0.0,
         "time_of_day": 10.0,         # mid-morning
         "success_threshold": 0.5,
+        "grader": "traffic_env:grade_task",
     },
     "peak_hour": {
         "description": "Rush-hour surge traffic (4-6 PM). Occasional emergency vehicles and pedestrian crossings.",
@@ -145,6 +146,7 @@ TASK_CONFIGS = {
         "pedestrian_prob": 0.15,
         "time_of_day": 17.0,
         "success_threshold": 0.6,
+        "grader": "traffic_env:grade_task",
     },
     "full_control": {
         "description": "High-density traffic with frequent emergency vehicles, incidents, and pedestrian phases. Frontier-model challenge.",
@@ -156,6 +158,7 @@ TASK_CONFIGS = {
         "pedestrian_prob": 0.25,
         "time_of_day": 8.0,
         "success_threshold": 0.7,
+        "grader": "traffic_env:grade_task",
     },
 }
 
