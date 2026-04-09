@@ -237,6 +237,9 @@ async def main() -> None:
             max_possible = MAX_STEPS * 5.0
             score = min(max(total_reward / max(max_possible, 1), 0.0), 1.0)
 
+        # Clamp score unconditionally to strict open interval (0, 1) for Validator
+        score = max(0.001, min(0.999, float(score)))
+
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as e:

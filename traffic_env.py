@@ -391,6 +391,8 @@ class TrafficControlEnv:
 
         # Weighted combination
         score = 0.4 * throughput_score + 0.4 * queue_score + 0.2 * reward_score
+        # Clamp to open interval (0, 1) — validator rejects exactly 0.0 and 1.0
+        score = max(0.001, min(0.999, score))
         return round(score, 4)
 
     # ── Internal Simulation ───────────────────────────────────────────────────
