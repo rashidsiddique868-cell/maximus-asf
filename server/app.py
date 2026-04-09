@@ -137,7 +137,15 @@ async def grade():
 @app.get("/tasks")
 async def list_tasks():
     tasks_list = [
-        {"id": name, "name": name, **cfg}
+        {
+            "id": name,
+            "name": name,
+            "difficulty": cfg["difficulty"],
+            "description": cfg["description"],
+            "max_steps": cfg["max_steps"],
+            "success_threshold": cfg["success_threshold"],
+            "grader": cfg["grader"],
+        }
         for name, cfg in TASK_CONFIGS.items()
     ]
     return {"tasks": tasks_list}
