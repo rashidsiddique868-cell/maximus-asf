@@ -136,7 +136,19 @@ async def grade():
 
 @app.get("/tasks")
 async def list_tasks():
-    return {"tasks": TASK_CONFIGS}
+    tasks_list = [
+        {
+            "id": name,
+            "name": name,
+            "difficulty": cfg["difficulty"],
+            "description": cfg["description"],
+            "max_steps": cfg["max_steps"],
+            "success_threshold": cfg["success_threshold"],
+            "grader": cfg.get("grader", "traffic_env:grade_task"),
+        }
+        for name, cfg in TASK_CONFIGS.items()
+    ]
+    return {"tasks": tasks_list}
 
 
 @app.get("/openenv.yaml", response_class=PlainTextResponse)
