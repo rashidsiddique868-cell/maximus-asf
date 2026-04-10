@@ -568,11 +568,64 @@ class TrafficControlEnv:
 
 # ─── Grader Functions ─────────────────────────────────────────────────────────
 
-async def grade_task(task: str, agent_actions: List[Dict], seed: int = 42) -> float:
+def grade_task(trajectory: Optional[Dict] = None, **kwargs) -> float:
     """
-    Run a full episode using provided actions and return score in [0, 1].
-    agent_actions: list of dicts with keys matching TrafficAction fields.
+    OpenEnv-compatible sync grader function.
+
+    Called by the hackathon validator with an episode trajectory dict.
+    Returns a score strictly in (0.0, 1.0).
+
+    trajectory: dict with optional keys:
+        - task (str): which task config to use
+        - actions (list): list of action dicts
+        - seed (int): random seed
     """
+    import asyncio
+
+    # Extract from trajectory dict or kwargs
+    if trajectory is None:
+        trajectory = {}
+    task = trajectory.get("task") or kwargs.get("task", "basic_flow")
+    agent_actions = trajectory.get("actions") or kwargs.get("agent_actions", [])
+    seed = trajectory.get("seed") or kwargs.get("seed", 42)
+
+    # Validate task exists
+    if task not in TASK_CONFIGS:
+        task = "basic_flow"
+
+    async def _run() -> float:
+        env = TrafficControlEnv(task=task, seed=seed)
+        await env.reset()
+        max_steps = TASK_CONFIGS[task]["max_steps"]
+
+        for i in range(max_steps):
+            if i < len(agent_actions):
+                raw = agent_actions[i]
+            else:
+                raw = {"phase": 0, "duration": 30, "emergency_override": False}
+            action = TrafficAction(**raw)
+            result = await env.step(action)
+            if result.done:
+                break
+
+        # Return score clamped to strict (0, 1) open interval
+        return max(0.001, min(0.999, env.grade()))
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, _run())
+                return future.result(timeout=120)
+        else:
+            return loop.run_until_complete(_run())
+    except Exception:
+        return asyncio.run(_run())
+
+
+async def grade_task_async(task: str, agent_actions: List[Dict], seed: int = 42) -> float:
+    """Async version of grade_task for internal use."""
     env = TrafficControlEnv(task=task, seed=seed)
     await env.reset()
     max_steps = TASK_CONFIGS[task]["max_steps"]
@@ -587,7 +640,7 @@ async def grade_task(task: str, agent_actions: List[Dict], seed: int = 42) -> fl
         if result.done:
             break
 
-    return env.grade()
+    return max(0.001, min(0.999, env.grade()))
 
 
 # ─── Quick smoke test ─────────────────────────────────────────────────────────
