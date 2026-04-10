@@ -118,7 +118,7 @@ async def test_difficulty_range():
     found = {cfg["difficulty"] for cfg in TASK_CONFIGS.values()}
     for d in difficulties:
         assert d in found, f"Missing difficulty level: {d}"
-    print("[OK] Difficulty range: easy → medium → hard")
+    print("[OK] Difficulty range: easy -> medium -> hard")
 
 
 async def test_reproducibility():
@@ -142,7 +142,7 @@ async def test_reproducibility():
 async def test_grade_task_helper():
     """grade_task() helper function works correctly."""
     actions = [{"phase": i % 4, "duration": 25, "emergency_override": False} for i in range(50)]
-    score = await grade_task("basic_flow", actions, seed=0)
+    score = grade_task({"task": "basic_flow", "actions": actions, "seed": 0})
     assert 0.0 <= score <= 1.0
     print(f"[OK] grade_task() helper — score={score:.4f}")
 
@@ -175,9 +175,9 @@ async def main():
 
     print("\n" + "="*55)
     if failed == 0:
-        print("  ✅ ALL CHECKS PASSED — Ready to submit!")
+        print("  [PASS] ALL CHECKS PASSED — Ready to submit!")
     else:
-        print(f"  ❌ {failed} check(s) FAILED — Fix before submitting.")
+        print(f"  [FAIL] {failed} check(s) FAILED — Fix before submitting.")
     print("="*55 + "\n")
 
     sys.exit(0 if failed == 0 else 1)
