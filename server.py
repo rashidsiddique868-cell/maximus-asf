@@ -153,3 +153,10 @@ async def list_tasks():
 async def openenv_yaml():
     with open("openenv.yaml", "r") as f:
         return f.read()
+
+def main():
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
+
+if __name__ == "__main__":
+    main()
