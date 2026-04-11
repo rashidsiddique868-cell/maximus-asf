@@ -142,8 +142,6 @@ async def list_tasks():
             "name": name,
             "difficulty": cfg["difficulty"],
             "description": cfg["description"],
-            "max_steps": cfg["max_steps"],
-            "success_threshold": cfg["success_threshold"],
             "grader": cfg.get("grader", "traffic_env:grade_task"),
         }
         for name, cfg in TASK_CONFIGS.items()

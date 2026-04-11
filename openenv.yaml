@@ -22,8 +22,6 @@ tasks:
     description: >
       Manage a 4-way intersection under moderate steady traffic.
       No emergency vehicles or incidents. Score 0.5+ to succeed.
-    max_steps: 50
-    success_threshold: 0.5
     grader: "traffic_env:grade_task"
 
   - name: peak_hour
@@ -32,8 +30,6 @@ tasks:
     description: >
       Rush-hour surge (4-6 PM). Occasional emergency vehicles and pedestrian
       crossings. Dynamic demand pattern. Score 0.6+ to succeed.
-    max_steps: 75
-    success_threshold: 0.6
     grader: "traffic_env:grade_task"
 
   - name: full_control
@@ -43,8 +39,6 @@ tasks:
       High-density traffic with frequent emergency vehicles, road incidents,
       and mandatory pedestrian phases. Frontier-model challenge.
       Score 0.7+ to succeed.
-    max_steps: 100
-    success_threshold: 0.7
     grader: "traffic_env:grade_task"
 
 action_space:
