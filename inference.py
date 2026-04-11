@@ -7,7 +7,6 @@ Usage:
   export API_BASE_URL=https://router.huggingface.co/v1
   export MODEL_NAME=Qwen/Qwen2.5-72B-Instruct
   export HF_TOKEN=your_hf_token
-  export TRAFFIC_TASK=basic_flow   # or peak_hour / full_control
   python inference.py
 """
 
@@ -25,23 +24,11 @@ from openai import OpenAI
 HF_TOKEN     = os.getenv("HF_TOKEN")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-TASK_NAME    = os.getenv("TRAFFIC_TASK", "basic_flow")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 BENCHMARK    = "traffic_control"
 
 TEMPERATURE  = 0.3
 MAX_TOKENS   = 200
-MAX_STEPS    = {
-    "basic_flow":   50,
-    "peak_hour":    75,
-    "full_control": 100,
-}.get(TASK_NAME, 50)
-
-SUCCESS_SCORE_THRESHOLD = {
-    "basic_flow":   0.5,
-    "peak_hour":    0.6,
-    "full_control": 0.7,
-}.get(TASK_NAME, 0.5)
 
 # ─── STDOUT Logging ───────────────────────────────────────────────────────────
 
@@ -85,7 +72,7 @@ Output ONLY a JSON object with these exact keys, nothing else:
 
 # ─── Agent Logic ──────────────────────────────────────────────────────────────
 
-def build_user_prompt(obs: Dict[str, Any], step: int, history: List[str]) -> str:
+def build_user_prompt(obs: Dict[str, Any], step: int, history: List[str], task_name: str) -> str:
     queues = {
         "N1": obs.get("queue_N1", 0), "N2": obs.get("queue_N2", 0),
         "S1": obs.get("queue_S1", 0), "S2": obs.get("queue_S2", 0),
@@ -93,25 +80,25 @@ def build_user_prompt(obs: Dict[str, Any], step: int, history: List[str]) -> str
         "W1": obs.get("queue_W1", 0), "W2": obs.get("queue_W2", 0),
     }
     total_queue = sum(queues.values())
-    dominant = max(queues, key=queues.get)
+    dominant = max(queues, key=queues.get) if queues else "N1"
 
     history_text = "\n".join(history[-4:]) if history else "None"
 
     return textwrap.dedent(f"""
-    Step {step} | Task: {TASK_NAME}
+    Step {step} | Task: {task_name}
     
     Queue lengths: {json.dumps(queues)}
     Total vehicles waiting: {total_queue}
-    Busiest lane: {dominant} ({queues[dominant]} vehicles)
+    Busiest lane: {dominant} ({queues.get(dominant, 0)} vehicles)
     
     Current phase: {obs.get('current_phase')} | Time remaining: {obs.get('phase_time_remaining')}s
     
-    Emergency: active={obs.get('emergency_active')} | direction={obs.get('emergency_direction') or 'none'} | distance={obs.get('emergency_distance'):.0f}m | type={obs.get('emergency_type') or 'none'}
+    Emergency: active={obs.get('emergency_active')} | direction={obs.get('emergency_direction') or 'none'} | distance={obs.get('emergency_distance', 0):.0f}m | type={obs.get('emergency_type') or 'none'}
     Incident active: {obs.get('incident_active')}
     Pedestrians waiting: {obs.get('pedestrian_waiting')}
     
     Throughput so far: {obs.get('throughput_last_phase')}
-    Avg wait time: {obs.get('avg_wait_time'):.1f}s
+    Avg wait time: {obs.get('avg_wait_time', 0.0):.1f}s
     
     Recent actions:
     {history_text}
@@ -120,9 +107,9 @@ def build_user_prompt(obs: Dict[str, Any], step: int, history: List[str]) -> str
     """).strip()
 
 
-def get_action(client: OpenAI, obs: Dict[str, Any], step: int, history: List[str]) -> Dict[str, Any]:
+def get_action(client: OpenAI, obs: Dict[str, Any], step: int, history: List[str], task_name: str) -> Dict[str, Any]:
     """Call LLM to get next action. Falls back to heuristic on failure."""
-    user_prompt = build_user_prompt(obs, step, history)
+    user_prompt = build_user_prompt(obs, step, history, task_name)
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
@@ -134,13 +121,11 @@ def get_action(client: OpenAI, obs: Dict[str, Any], step: int, history: List[str
             max_tokens=MAX_TOKENS,
         )
         text = (completion.choices[0].message.content or "").strip()
-        # Strip markdown fences if present
         if "```" in text:
             text = text.split("```")[1].strip()
             if text.startswith("json"):
                 text = text[4:].strip()
         action = json.loads(text)
-        # Validate keys
         assert "phase" in action and "duration" in action and "emergency_override" in action
         return action
     except Exception as exc:
@@ -154,12 +139,12 @@ def _heuristic_action(obs: Dict[str, Any]) -> Dict[str, Any]:
         return {"phase": 7, "duration": 20, "emergency_override": True}
 
     queues = {
-        0: obs.get("queue_N1", 0) + obs.get("queue_S1", 0),  # NS Through
-        1: obs.get("queue_N2", 0) + obs.get("queue_S2", 0),  # NS Left
-        2: obs.get("queue_E1", 0) + obs.get("queue_W1", 0),  # EW Through
-        3: obs.get("queue_E2", 0) + obs.get("queue_W2", 0),  # EW Left
+        0: obs.get("queue_N1", 0) + obs.get("queue_S1", 0),
+        1: obs.get("queue_N2", 0) + obs.get("queue_S2", 0),
+        2: obs.get("queue_E1", 0) + obs.get("queue_W1", 0),
+        3: obs.get("queue_E2", 0) + obs.get("queue_W2", 0),
     }
-    best_phase = max(queues, key=queues.get)
+    best_phase = max(queues, key=queues.get) if queues else 0
     return {"phase": best_phase, "duration": 30, "emergency_override": False}
 
 # ─── Environment Client ───────────────────────────────────────────────────────
@@ -185,69 +170,68 @@ async def env_grade() -> float:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 async def main() -> None:
+    print("Beginning inference for all tasks...")
+    tasks_to_run = ["basic_flow", "peak_hour", "full_control"]
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-
-    rewards: List[float] = []
-    history: List[str] = []
-    steps_taken = 0
-    score = 0.0
-    success = False
-
-    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
-
-    try:
-        reset_data = await env_reset(TASK_NAME)
-        obs = reset_data["observation"]
-
-        for step in range(1, MAX_STEPS + 1):
-            action = get_action(client, obs, step, history)
-
-            try:
-                result = await env_step(action)
-            except Exception as e:
-                log_step(step=step, action=str(action), reward=0.0, done=True, error=str(e))
-                break
-
-            reward = result.get("reward", 0.0)
-            done = result.get("done", False)
-            obs = result.get("observation", obs)
-            info = result.get("info", {})
-            error = None
-
-            rewards.append(reward)
-            steps_taken = step
-
-            action_str = json.dumps(action, separators=(",", ":"))
-            log_step(step=step, action=action_str, reward=reward, done=done, error=error)
-
-            history.append(
-                f"Step {step}: phase={action['phase']} dur={action['duration']} "
-                f"override={action['emergency_override']} → reward={reward:+.2f}"
-            )
-
-            if done:
-                break
-
-        # Get final score from environment
+    
+    for task in tasks_to_run:
+        print(f"\\n--- Starting Evaluation for Task: {task} ---")
+        max_t = {"basic_flow": 50, "peak_hour": 75, "full_control": 100}.get(task, 50)
+        success_threshold = {"basic_flow": 0.5, "peak_hour": 0.6, "full_control": 0.7}.get(task, 0.5)
+        
+        log_start(task=task, env=BENCHMARK, model=MODEL_NAME)
+        
+        success = False
+        steps_taken = 0
+        rewards = []
+        history = []
+        score = 0.0
+        
         try:
-            score = await env_grade()
-        except Exception:
-            # Fallback scoring if server unreachable
-            total_reward = sum(rewards)
-            max_possible = MAX_STEPS * 5.0
-            score = min(max(total_reward / max(max_possible, 1), 0.0), 1.0)
-
-        # Clamp score unconditionally to strict open interval (0, 1) for Validator
-        score = max(0.001, min(0.999, float(score)))
-
-        success = score >= SUCCESS_SCORE_THRESHOLD
-
-    except Exception as e:
-        print(f"[DEBUG] Episode error: {e}", flush=True)
-
-    finally:
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
-
+            reset_data = await env_reset(task)
+            obs = reset_data["observation"]
+            
+            for step in range(1, max_t + 1):
+                action = get_action(client, obs, step, history, task)
+                
+                try:
+                    result = await env_step(action)
+                except Exception as e:
+                    log_step(step=step, action=str(action), reward=0.0, done=True, error=str(e))
+                    break
+                    
+                reward = result.get("reward", 0.0)
+                done = result.get("done", False)
+                obs = result.get("observation", obs)
+                
+                rewards.append(reward)
+                steps_taken = step
+                
+                action_str = json.dumps(action, separators=(",", ":"))
+                log_step(step=step, action=action_str, reward=reward, done=done, error=None)
+                
+                history.append(
+                    f"Step {step}: phase={action['phase']} dur={action['duration']} "
+                    f"override={action['emergency_override']} -> reward={reward:+.2f}"
+                )
+                
+                if done:
+                    break
+                    
+            try:
+                raw_score = await env_grade()
+            except Exception:
+                total_reward = sum(rewards)
+                raw_score = total_reward / max(max_t * 5.0, 1.0)
+                
+            score = max(0.001, min(0.999, float(raw_score)))
+            success = score >= success_threshold
+            
+        except Exception as e:
+            print(f"[DEBUG] Episode error: {e}", flush=True)
+            
+        finally:
+            log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -80,7 +80,7 @@ class StepResponse(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "task": _current_task}
+    return {"status": "ok", "task": _current_task}
 
 
 @app.post("/reset", response_model=ResetResponse)
@@ -142,9 +142,7 @@ async def list_tasks():
             "name": name,
             "difficulty": cfg["difficulty"],
             "description": cfg["description"],
-            "max_steps": cfg["max_steps"],
-            "success_threshold": cfg["success_threshold"],
-            "grader": cfg["grader"],
+            "grader": cfg.get("grader", "traffic_env:grade_task"),
         }
         for name, cfg in TASK_CONFIGS.items()
     ]
@@ -155,10 +153,3 @@ async def list_tasks():
 async def openenv_yaml():
     with open("openenv.yaml", "r") as f:
         return f.read()
-
-def main():
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=7860)
-
-if __name__ == "__main__":
-    main()
